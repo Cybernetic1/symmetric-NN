@@ -23,7 +23,6 @@ extern void free_NN(NNET *, int *);
 extern void forward_prop_sigmoid(NNET *, int, double *);
 extern void forward_prop_ReLU(NNET *, int, double *);
 extern void forward_prop_softplus(NNET *, int, double *);
-extern void forward_prop_x2(NNET *, int, double *);
 extern void back_prop(NNET *, double *);
 extern void back_prop_ReLU(NNET *, double *);
 extern void re_randomize(NNET *, int, int *);
@@ -59,7 +58,7 @@ double target_func(double x[M][N], double y[N])		// dim X = M × N, dim Y = N
 	// **** Sort input elements
 	
 
-	#define k2 500.0				// k² where k = 10.0
+	#define k2 1.0				// k² where k = 10.0
 	for (int i = 0; i < N; ++i)		// calculate each component of y
 		{
 		y[i] = 0.0;
