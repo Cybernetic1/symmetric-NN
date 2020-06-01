@@ -58,7 +58,7 @@ double target_func(double x[M][N], double y[N])		// dim X = M × N, dim Y = N
 	// **** Sort input elements
 	
 
-	#define k2 1.0				// k² where k = 10.0
+	#define k2 4.0				// k² where k = 10.0
 	for (int i = 0; i < N; ++i)		// calculate each component of y
 		{
 		y[i] = 0.0;
@@ -349,7 +349,7 @@ int main(int argc, char **argv)
 			//	break;
 			}
 
-		if ((l % 10000) == 0) // display status periodically
+		if ((l % 1000) == 0) // display status periodically
 			{
 			s += sprintf(s, "mean error=%e", mean_err);
 			printf("%s\n", status);
