@@ -347,24 +347,3 @@ void back_prop(NNET *net, double *errors)
 			}
 		}
 	}
-
-// Calculate error between output of forward-prop and a given answer Y
-double calc_error(NNET *net, double Y[], double *errors)
-	{
-	// calculate mean square error
-	// desired value = Y = K* = trainingOUT
-	double sumOfSquareError = 0;
-
-	int numLayers = net->numLayers;
-	LAYER lastLayer = net->layers[numLayers - 1];
-	// This means each output neuron corresponds to a classification label --YKY
-	for (int n = 0; n < lastLayer.numNeurons; n++)
-		{
-		//error = desired_value - output
-		double error = Y[n] - lastLayer.neurons[n].output;
-		errors[n] = error;
-		sumOfSquareError += error * error / 2;
-		}
-	double mse = sumOfSquareError / lastLayer.numNeurons;
-	return mse; //return mean square error
-	}
