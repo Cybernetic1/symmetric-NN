@@ -98,11 +98,18 @@ int main(int argc, char **argv)
 		lastLayer_h[m] = Net_h[m]->layers[numLayers - 1];
 		}
 
-	int userKey = 0;
-	#define num_errs	50			// how many errors to record for averaging
-	double errors1[num_errs], errors2[num_errs]; // two arrays for recording errors
+	// ***** We keep 2 arrays of errors, one is NEWER and one OLDER.
+	// The 2 arrays join together as one cyclic array.
+	// This enables us to compare the average errors of the NEW and OLD arrays,
+	// and calculate a RATIO of the two.
+	#define err_cycle	50			// how many errors to record for averaging
+	double errors1[err_cycle], errors2[err_cycle]; // two arrays for recording errors
 	double sum_err1 = 0.0, sum_err2 = 0.0; // sums of errors
 	int tail = 0; // index for cyclic arrays (last-in, first-out)
+
+	double training_err = 0.0;
+	for (int i = 0; i < err_cycle; ++i) // clear errors to 0.0
+		errors1[i] = errors2[i] = 0.0;
 
 	srand(time(NULL));				// random seed
 
@@ -123,9 +130,6 @@ int main(int argc, char **argv)
 			printf("%f ", c[0][m][i]);
 		printf("\n");
 		}
-
-	for (int i = 0; i < num_errs; ++i) // clear errors to 0.0
-		errors1[i] = errors2[i] = 0.0;
 
 	char status[1024], *s;				// string buffer for status message
 
@@ -175,30 +179,28 @@ int main(int argc, char **argv)
 
 		// **** Calculate average error in a cyclic buffer of RMS errors
 
-		double training_err = 0.0;
-
-		training_err += RMS_error; // record sum of errors
+		training_err = RMS_error;		// ? dunno why I used 2 variable names
 		// printf("RMS error = %lf  ", training_err);
 
 		// **** Update error arrays cyclically
 		// (This is easier to understand by referring to the next block of code)
-		sum_err2 -= errors2[tail];
-		sum_err2 += errors1[tail];
-		sum_err1 -= errors1[tail];
-		sum_err1 += training_err;
+		sum_err2 -= errors2[tail];		// minus what is to be kicked out
+		sum_err2 += errors1[tail];		// add what is to be inserted
+		sum_err1 -= errors1[tail];		// minus what is to be kicked out
+		sum_err1 += training_err;		// add newly inserted
 		// printf("sum1, sum2 = %lf %lf\n", sum_err1, sum_err2);
 
-		double mean_err = (l < num_errs) ? (sum_err1 / l) : (sum_err1 / num_errs);
-		if (mean_err < 2.0)
-			s += sprintf(s, "mean |e|=%1.06lf, ", mean_err);
+		double avg_err = (l < err_cycle) ? (sum_err1 / l) : (sum_err1 / err_cycle);
+		if (avg_err < 2.0)
+			s += sprintf(s, "average RMS error=%1.06lf, ", avg_err);
 		else
-			s += sprintf(s, "mean |e|=%e, ", mean_err);
+			s += sprintf(s, "average RMS error=%e, ", avg_err);
 
 		// record new error in cyclic arrays
-		errors2[tail] = errors1[tail];
-		errors1[tail] = training_err;
+		errors2[tail] = errors1[tail];		// errors2 = OLDER array
+		errors1[tail] = training_err;		// errors1 = NEWER array
 		++tail;
-		if (tail == num_errs) // loop back in cycle
+		if (tail == err_cycle)				// loop back in cycle
 			tail = 0;
 
 		// ***** Back-propagation
@@ -234,6 +236,7 @@ int main(int argc, char **argv)
 						Net_h[m]->layers[l].neurons[n].weights[i + 1] = avg;
 					}
 
+		// ***** Test the network
 		if ((l % 200) == -1)	// 0 = enable this part, -1 = disable
 			{
 			// Testing set
@@ -274,44 +277,45 @@ int main(int argc, char **argv)
 			}
 
 		// **** If no convergence for a long time...
-		if (l > 50 && (isnan(mean_err) || mean_err > 10.0))
+		if (l > 50 && (isnan(avg_err) || avg_err > 10.0))
 			{
 			re_randomize(Net_h[0], numLayers, neuronsPerLayer);
 			sum_err1 = 0.0; sum_err2 = 0.0;
 			tail = 0;
-			for (int j = 0; j < num_errs; ++j) // clear errors to 0.0
+			for (int j = 0; j < err_cycle; ++j) // clear errors to 0.0
 				errors1[j] = errors2[j] = 0.0;
 			l = 1;
 
 			printf("\n****** Network re-randomized.\n");
 			}
 
-		if ((l % 50) == -1)
+		// ***** periodically display the ratio of average errors
+		if ((l % 1000) == 0)
 			{
 			double ratio = (sum_err2 - sum_err1) / sum_err1;
 			if (ratio > 0)
-				s += sprintf(s, "|e| ratio=%e", ratio);
+				s += sprintf(s, "|e| ratio=%e\n", ratio);
 			else
-				s += sprintf(s, "|e| ratio=\x1b[31m%e\x1b[39;49m", ratio);
+				s += sprintf(s, "|e| ratio=\x1b[31m%e\x1b[39;49m\n", ratio);
 			//if (isnan(ratio))
 			//	break;
 			}
 
 		if ((l % 1000) == 0) // display status periodically
 			{
-			s += sprintf(s, "mean error=%e", mean_err);
+			s += sprintf(s, "average error=%e", avg_err);
 			printf("%s\n", status);
 			}
 
 		// if (ratio - 0.5f < 0.0000001)	// ratio == 0.5 means stationary
 		// if (test_err < 0.01)
 
-		if (userKey == 3)			// Re-start with new random weights
+		if (false)  // (userKey == 3)		// Re-start with new random weights
 			{
 			re_randomize(Net_h[0], numLayers, neuronsPerLayer);
 			sum_err1 = 0.0; sum_err2 = 0.0;
 			tail = 0;
-			for (int j = 0; j < num_errs; ++j) // clear errors to 0.0
+			for (int j = 0; j < err_cycle; ++j) // clear errors to 0.0
 				errors1[j] = errors2[j] = 0.0;
 			l = 1;
 
