@@ -2,13 +2,12 @@
 // Not much is remarkable here;
 // The novel symmetric NN algorithm is entirely contained in the symmetric-NN.C++ file
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>		// constants "true" and "false"
-#include <math.h>
-#include <assert.h>
-#include <time.h>			// time as random seed in create_NN()
+#include <cmath>
+#include <cassert>
+#include <array>
 #include "feedforward-NN.h"
+
+using namespace std;
 
 #define Eta 0.01			// learning rate
 #define BIASINPUT 1.0		// input for bias. It's always 1.
@@ -132,7 +131,7 @@ void free_NN(NNET *net, int *neuronsPerLayer)
 
 //**************************** forward-propagation ***************************//
 
-void forward_prop_sigmoid(NNET *net, int dim_V, double V[])
+void forward_prop_sigmoid(NNET *net, int dim_V, array <double, N> V)
 	{
 	// set the output of input layer
 	for (int i = 0; i < dim_V; ++i)
@@ -179,7 +178,7 @@ void forward_prop_sigmoid(NNET *net, int dim_V, double V[])
 	}
 
 // Same as above, except with soft_plus activation function
-void forward_prop_softplus(NNET *net, int dim_V, double V[])
+void forward_prop_softplus(NNET *net, int dim_V, array <double, N> V)
 	{
 	// set the output of input layer
 	for (int i = 0; i < dim_V; ++i)
@@ -210,7 +209,7 @@ void forward_prop_softplus(NNET *net, int dim_V, double V[])
 
 // Same as above, except with rectifier activation function
 // ReLU = "rectified linear unit"
-void forward_prop_ReLU(NNET *net, int dim_V, double V[])
+void forward_prop_ReLU(NNET *net, int dim_V, array <double, N> V)
 	{
 	// set the output of input layer
 	for (int i = 0; i < dim_V; ++i)
@@ -246,7 +245,7 @@ void forward_prop_ReLU(NNET *net, int dim_V, double V[])
 	}
 
 // Same as above, except with x² activation function
-void forward_prop_x2(NNET *net, int dim_V, double V[])
+void forward_prop_x2(NNET *net, int dim_V, array <double, N> V)
 	{
 	// set the output of input layer
 	for (int i = 0; i < dim_V; ++i)

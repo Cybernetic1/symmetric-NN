@@ -21,4 +21,9 @@ typedef struct NNET
     LAYER *layers;
 	} NNET; //neural network
 
-#define dim_K	10
+// The input vector is of dimension N × M, where
+// M = number of input elements, which I also call 'multiplicity':
+#define M		5
+// N = dimension of the embedding / encoding of each input element:
+#define N		2
+

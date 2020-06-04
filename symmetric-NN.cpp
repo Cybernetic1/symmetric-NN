@@ -7,11 +7,12 @@
 // The h-networks are summed over M inputs, where M is the Multiplicity
 
 // TO-DO:
-// * Sort inputs to target function
 
 #include <iostream>
 #include <cstdio>
 #include <cmath>
+#include <cassert>
+#include <array>
 #include <algorithm>
 #include <random>
 #include "feedforward-NN.h"
@@ -20,23 +21,18 @@ using namespace std;
 
 extern NNET *create_NN(int, int *);
 extern void free_NN(NNET *, int *);
-extern void forward_prop_sigmoid(NNET *, int, double *);
-extern void forward_prop_ReLU(NNET *, int, double *);
-extern void forward_prop_softplus(NNET *, int, double *);
-extern void back_prop(NNET *, double *);
-extern void back_prop_ReLU(NNET *, double *);
-extern double calc_error(NNET *, double *, double *);
+extern void forward_prop_sigmoid(NNET *, int, array <double, N>);
+extern void forward_prop_ReLU(NNET *, int, array <double, N>);
+extern void forward_prop_softplus(NNET *, int, array <double, N>);
+extern void back_prop(NNET *, double []);
+extern void back_prop_ReLU(NNET *, double []);
 extern void re_randomize(NNET *, int, int *);
 extern double sigmoid(double);
 
-// The input vector is of dimension N × M, where
-// M = number of input elements, which I also call 'multiplicity':
-#define M		5
-// N = dimension of the embedding / encoding of each input element:
-#define N		2
-
-double X[M][N];
-double Y[N];
+// The input vector X (with multiplicity M) is an array of shape X[M][N]
+// The C++ "array" structure is used because sort() cannot be applied on simple 2D arrays
+array <array <double, N>, M> X = {};
+array <double, N> Y;			// output vector of shape Y[N]
 
 double random01()		// create random number in standard interval, eg. [-1,1]
 	{
@@ -54,12 +50,26 @@ double random01()		// create random number in standard interval, eg. [-1,1]
 // Centers of N Gaussian functions:
 double c[N][M][N];
 
-double target_func(double x[M][N], double y[N])		// dim X = M × N, dim Y = N
+// For sorting elements of X in lexicographic order
+bool compareX(array <double, N> x1, array <double, N> x2)
+	{
+	for (int i = 0; i < N; ++i)
+		if (x1[i] < x2[i])
+			return true;
+		else if (x1[i] > x2[i])
+			return false;
+		else
+			assert(false);
+	assert(false);
+	}
+
+double target_func(array <array <double, N>, M> x, double y[N])
+// dim X = M × N, dim Y = N
 	{
 	// **** Sort input elements
-	
+	sort(X.begin(), X.begin() + M, compareX);
 
-	#define k2 4.0				// k² where k = 10.0
+	#define k2 2.0				// k² where k = 10.0
 	for (int i = 0; i < N; ++i)		// calculate each component of y
 		{
 		y[i] = 0.0;
@@ -102,7 +112,7 @@ int main(int argc, char **argv)
 	// The 2 arrays join together as one cyclic array.
 	// This enables us to compare the average errors of the NEW and OLD arrays,
 	// and calculate a RATIO of the two.
-	#define err_cycle	50			// how many errors to record for averaging
+	#define err_cycle	1000			// how many errors to record for averaging
 	double errors1[err_cycle], errors2[err_cycle]; // two arrays for recording errors
 	double sum_err1 = 0.0, sum_err2 = 0.0; // sums of errors
 	int tail = 0; // index for cyclic arrays (last-in, first-out)
@@ -294,16 +304,16 @@ int main(int argc, char **argv)
 			{
 			double ratio = (sum_err2 - sum_err1) / sum_err1;
 			if (ratio > 0)
-				s += sprintf(s, "|e| ratio=%e\n", ratio);
+				s += sprintf(s, "|e| ratio=%e", ratio);
 			else
-				s += sprintf(s, "|e| ratio=\x1b[31m%e\x1b[39;49m\n", ratio);
+				s += sprintf(s, "|e| ratio=\x1b[31m%e\x1b[39;49m", ratio);
 			//if (isnan(ratio))
 			//	break;
 			}
 
 		if ((l % 1000) == 0) // display status periodically
 			{
-			s += sprintf(s, "average error=%e", avg_err);
+			// s += sprintf(s, "average error=%e", avg_err);
 			printf("%s\n", status);
 			}
 
