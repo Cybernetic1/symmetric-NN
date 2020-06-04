@@ -18,6 +18,6 @@ Both papers' proofs employ an "exponentiation" idea that seems crucial to the pr
 
 The following is a schematic diagram of the full network:
 
-<img src="g-and-h-networks.png" style="width: 20vw"/>
+<img src="g-and-h-networks.png" style="width: 40%"/>
 
 The code is not difficult to write once we realize that the "bridge" can be regarded as a neural network layer with sparse weights.
