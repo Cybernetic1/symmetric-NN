@@ -32,7 +32,7 @@ extern double sigmoid(double);
 array <array <double, N>, M> X = {};
 array <double, N> Y;			// output vector of shape Y[N]
 
-double random01()		// create random number in standard interval, eg. [-1,1]
+double randomUnit()		// create random number in standard interval, eg. [-1,1]
 	{
 	return rand() * 2.0 / (float) RAND_MAX - 1.0;
 	}
@@ -48,6 +48,21 @@ double random01()		// create random number in standard interval, eg. [-1,1]
 // Centers of N Gaussian functions:
 double c[N][M][N];
 
+// ***** Generate random target function
+// ie, generate the random centers of N Gaussian functions
+// Note that these centers are 'sorted' such that the resulting points all reside in the
+// 'symmetric' region.
+void generate_random_target()
+	{
+	for (int n = 0; n < N; ++n)
+		for (int m = 0; m < M; ++m)
+			{
+			for (int i = 0; i < N; ++i)
+				c[n][m][i] = randomUnit();
+			sort(c[n][m], c[n][m] + N);
+			}
+	}
+
 // For sorting elements of X in lexicographic order
 bool compareX(array <double, N> x1, array <double, N> x2)
 	{
@@ -61,13 +76,13 @@ bool compareX(array <double, N> x1, array <double, N> x2)
 	assert(false);
 	}
 
-double target_func(array <array <double, N>, M> x, double y[N])
+double target_func(array <array <double, N>, M> x, double *y)
 // dim X = M × N, dim Y = N
 	{
 	// **** Sort input elements
 	sort(X.begin(), X.begin() + M, compareX);
 
-	#define k2 10.0				// k² where k = 10.0
+	#define k2 4.0				// k² where k = 10.0
 	for (int i = 0; i < N; ++i)		// calculate each component of y
 		{
 		y[i] = 0.0;
@@ -219,25 +234,24 @@ int main(int argc, char **argv)
 	for (int i = 0; i < err_cycle; ++i) // clear errors to 0.0
 		errors1[i] = errors2[i] = 0.0;
 
-	// ***** Generate random target function
-	// ie, generate the random centers of N Gaussian functions
-	// Note that these centers are 'sorted' such that the resulting points all reside in the
-	// 'symmetric' region.
-	for (int n = 0; n < N; ++n)
-		for (int m = 0; m < M; ++m)
-			{
-			for (int i = 0; i < N; ++i)
-				c[n][m][i] = random01();
-			sort(c[n][m], c[n][m] + N);
-			}
+	generate_random_target();
 
-	for (int m = 0; m < M; ++m)
+	for (int l = 0; l < 1000; ++l)
 		{
-		for (int i = 0; i < N; ++i)
-			printf("%f ", c[0][m][i]);
-		printf("\n");
-		}
+		// ***** Create M random X vectors (each of dim N)
+		for (int m = 0; m < M; ++m)
+			for (int i = 0; i < N; ++i)
+				X[m][i] = randomUnit();
 
+		double ideal[N];
+		target_func(X, ideal);
+
+		printf("[");
+		for (int i = 0; i < N; ++i)
+			printf("%1.05lf ", ideal[i]);
+		printf("\b]\n");
+		}
+	
 	for (int l = 1; true; ++l)			// ***** Main loop
 		{
 		s = status + sprintf(status, "[%05d] ", l);
@@ -245,7 +259,7 @@ int main(int argc, char **argv)
 		// ***** Create M random X vectors (each of dim N)
 		for (int m = 0; m < M; ++m)
 			for (int i = 0; i < N; ++i)
-				X[m][i] = random01();
+				X[m][i] = randomUnit();
 
 		forward_prop();
 
@@ -254,7 +268,7 @@ int main(int argc, char **argv)
 		backward_prop();
 		
 		// **** If no convergence for a long time, re-randomize network
-		if (l > 100000 && (isnan(avg_err) || avg_err > 2.0))
+		if (l > 100000 && (isnan(avg_err) || avg_err > 1.0))
 			{
 			re_randomize(Net_h[0], numLayers, neuronsPerLayer);
 			sum_err1 = 0.0; sum_err2 = 0.0;
