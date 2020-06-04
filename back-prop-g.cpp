@@ -1,11 +1,11 @@
 // ******** This file contains code for standard back-propagation ********
-// Not much is remarkable here;
-// The novel symmetric NN algorithm is entirely contained in the symmetric-NN.C++ file
+// This code is used for the g-network which is just a regular neural network;
+// Not much is remarkable here.
 
 #include <cmath>
 #include <cassert>
 #include <array>
-#include "feedforward-NN.h"
+#include "g-network.h"
 
 using namespace std;
 
@@ -52,16 +52,6 @@ double softplus(double v)
 double d_softplus(double v)
 	{
 	return Slope * 1.0 / (1.0 + exp(Slope * -v));
-	}
-
-double x2(double v)
-	{
-	return v * v + v;
-	}
-
-double d_x2(double v)
-	{
-	return 2.0 * v + 1.0;
 	}
 
 //****************************create neural network*********************//
@@ -240,36 +230,6 @@ void forward_prop_ReLU(NNET *net, int dim_V, array <double, N> V)
 			//	net->layers[l].neurons[n].grad = Leakage;
 			else
 				net->layers[l].neurons[n].grad = 1.0;
-			}
-		}
-	}
-
-// Same as above, except with x² activation function
-void forward_prop_x2(NNET *net, int dim_V, array <double, N> V)
-	{
-	// set the output of input layer
-	for (int i = 0; i < dim_V; ++i)
-		net->layers[0].neurons[i].output = V[i];
-
-	// calculate output from hidden layers to output layer
-	for (int l = 1; l < net->numLayers; l++)
-		{
-		for (int n = 0; n < net->layers[l].numNeurons; n++)
-			{
-			double v = 0.0; // induced local field for neurons
-			// calculate v, which is the sum of the product of input and weights
-			for (int k = 0; k <= net->layers[l - 1].numNeurons; k++)
-				{
-				if (k == 0)
-					v += net->layers[l].neurons[n].weights[k] * BIASINPUT;
-				else
-					v += net->layers[l].neurons[n].weights[k] *
-						net->layers[l - 1].neurons[k - 1].output;
-				}
-
-			net->layers[l].neurons[n].output = x2(v);
-
-			net->layers[l].neurons[n].grad = d_x2(v);
 			}
 		}
 	}

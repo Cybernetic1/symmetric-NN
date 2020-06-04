@@ -1,1 +1,1 @@
-g++ symmetric-NN.cpp back-prop.cpp -o symmetric-NN
+g++ symmetric-NN.cpp back-prop-g.cpp back-prop-h.cpp -o symmetric-NN

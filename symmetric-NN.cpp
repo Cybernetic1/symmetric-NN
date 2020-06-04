@@ -13,19 +13,21 @@
 #include <array>
 #include <algorithm>
 #include <random>
-#include "feedforward-NN.h"
+#include "g-network.h"
+#include "h-network.h"
 
 using namespace std;
 
 extern NNET *create_NN(int, int *);
+extern NNET_h *create_NN_h(int, int *);
 extern void free_NN(NNET *, int *);
+extern void free_NN_h(NNET_h *, int *);
 extern void forward_prop_sigmoid(NNET *, int, array <double, N>);
-extern void forward_prop_ReLU(NNET *, int, array <double, N>);
-extern void forward_prop_softplus(NNET *, int, array <double, N>);
+extern void forward_prop_sigmoid_h(NNET_h *, int, array <array <double, N>, M>);
 extern void back_prop(NNET *, double []);
-extern void back_prop_ReLU(NNET *, double []);
+extern void back_prop_h(NNET_h *, double []);
 extern void re_randomize(NNET *, int, int *);
-extern double sigmoid(double);
+extern void re_randomize_h(NNET_h *, int, int *);
 
 // The input vector X (with multiplicity M) is an array of shape X[M][N]
 // The C++ "array" structure is used because sort() cannot be applied on simple 2D arrays
@@ -101,23 +103,22 @@ double target_func(array <array <double, N>, M> x, double *y)
 // trials, then compare their ratio.
 
 #define ForwardPropMethod	forward_prop_sigmoid
-#define ErrorThreshold		0.02
+#define ForwardPropMethod_h	forward_prop_sigmoid_h
 
 NNET *Net_g;			// g-network
 LAYER lastLayer_g;
-int NN_topology_g[] = {N, 5, 8, 10, 8, 5, N}; // first = input layer, last = output layer
+int NN_topology_g[] = {N, 5, 10, 5, N}; // first = input layer, last = output layer
 int numLayers_g = sizeof (NN_topology_g) / sizeof (int);
 
-NNET *Net_h[M];			// h-network × M times
-LAYER lastLayer_h[M];
-int NN_topology_h[] = {N, 5, 8, 5, N}; // first = input layer, last = output layer
+NNET_h *Net_h;			// h-network × M times
+LAYER_h lastLayer_h;
+int NN_topology_h[] = {N, 5, 8, 10, 8, 5, N}; // first = input layer, last = output layer
 int numLayers_h = sizeof (NN_topology_h) / sizeof (int);
 
 // ***** Forward propagation (g- and h-networks)
 void forward_prop()
 	{
-	for (int m = 0; m < M; ++m)
-		ForwardPropMethod(Net_h[m], N, X[m]);			// X[m] is updated
+	ForwardPropMethod_h(Net_h, N, X);			// X is updated M times
 
 	// Bridge layer: add up X[m] to get Y
 	for (int i = 0; i < N; ++i)
@@ -200,10 +201,9 @@ void backward_prop()
 		}
 
 	// ***** Back-propagate the h-networks
-	for (int m = 0; m < M; m++)
-		back_prop(Net_h[m], error);
+	back_prop_h(Net_h, error);
 
-	// ***** Updated weights of the h-networks is now averaged:
+	/***** Updated weights of the h-networks is now averaged:
 	for (int l = 1; l < numLayers_h; ++l)		// for all layers except 0th which has no weights
 		for (int n = 0; n < Net_h[0]->layers[l].numNeurons; n++)	// for each neuron
 			for (int i = 0; i < Net_h[0]->layers[l - 1].numNeurons; i++) // for each weight
@@ -218,6 +218,7 @@ void backward_prop()
 				for (int m = 0; m < M; ++m)		// for each multiplicity
 					Net_h[m]->layers[l].neurons[n].weights[i + 1] = avg;
 				}
+	*/
 	}
 
 int main(int argc, char **argv)
@@ -226,11 +227,8 @@ int main(int argc, char **argv)
 	Net_g = create_NN(numLayers_g, NN_topology_g);
 	lastLayer_g = Net_g->layers[numLayers_g - 1];
 
-	for (int m = 0; m < M; ++m)
-		{
-		Net_h[m] = create_NN(numLayers_h, NN_topology_h);
-		lastLayer_h[m] = Net_h[m]->layers[numLayers_h - 1];
-		}
+	Net_h = create_NN_h(numLayers_h, NN_topology_h);
+	lastLayer_h = Net_h->layers[numLayers_h - 1];
 
 	for (int i = 0; i < err_cycle; ++i) // clear errors to 0.0
 		errors1[i] = errors2[i] = 0.0;
@@ -272,7 +270,8 @@ int main(int argc, char **argv)
 		// **** If no convergence for a long time, re-randomize network
 		if (l > 100000 && (isnan(avg_err) || avg_err > 1.0))
 			{
-			re_randomize(Net_h[0], numLayers_h, NN_topology_h);
+			re_randomize(Net_g, numLayers_h, NN_topology_g);
+			re_randomize_h(Net_h, numLayers_h, NN_topology_h);
 			sum_err1 = 0.0; sum_err2 = 0.0;
 			tail = 0;
 			for (int j = 0; j < err_cycle; ++j) // clear errors to 0.0
@@ -296,6 +295,5 @@ int main(int argc, char **argv)
 
 	// ***** Free allocated memory
 	free_NN(Net_g, NN_topology_g);
-	for (int m = 0; m < M; ++m)
-		free_NN(Net_h[m], NN_topology_h);
+	free_NN_h(Net_h, NN_topology_h);
 	}
