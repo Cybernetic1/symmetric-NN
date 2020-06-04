@@ -8,8 +8,6 @@
 
 // TO-DO:
 
-#include <iostream>
-#include <cstdio>
 #include <cmath>
 #include <cassert>
 #include <array>
@@ -69,7 +67,7 @@ double target_func(array <array <double, N>, M> x, double y[N])
 	// **** Sort input elements
 	sort(X.begin(), X.begin() + M, compareX);
 
-	#define k2 2.0				// k² where k = 10.0
+	#define k2 10.0				// k² where k = 10.0
 	for (int i = 0; i < N; ++i)		// calculate each component of y
 		{
 		y[i] = 0.0;
@@ -92,38 +90,136 @@ double target_func(array <array <double, N>, M> x, double y[N])
 #define ForwardPropMethod	forward_prop_sigmoid
 #define ErrorThreshold		0.02
 
+NNET *Net_g;			// g-network
+LAYER lastLayer_g;
+NNET *Net_h[M];			// h-network × M times
+LAYER lastLayer_h[M];
+int neuronsPerLayer[] = {N, 10, N}; // first = input layer, last = output layer
+int numLayers = sizeof (neuronsPerLayer) / sizeof (int);
+
+// ***** Forward propagation (g- and h-networks)
+void forward_prop()
+	{
+	for (int m = 0; m < M; ++m)
+		ForwardPropMethod(Net_h[m], N, X[m]);			// X[m] is updated
+
+	// Bridge layer: add up X[m] to get Y
+	for (int i = 0; i < N; ++i)
+		{
+		Y[i] = 0;
+		for (int m = 0; m < M; ++m)
+			{
+			Y[i] += X[m][i];
+			}
+		}
+
+	ForwardPropMethod(Net_g, N, Y);					// Y is updated
+	}
+
+// ***** We keep 2 arrays of errors, one is NEWER and one OLDER.
+// The 2 arrays join together as one cyclic array.
+// This enables us to compare the average errors of the NEW and OLD arrays,
+// and calculate a RATIO of the two.
+#define err_cycle	1000			// how many errors to record for averaging
+double errors1[err_cycle], errors2[err_cycle]; // two arrays for recording errors
+double sum_err1 = 0.0, sum_err2 = 0.0; // sums of errors
+int tail = 0; // index for cyclic arrays (last-in, first-out)
+double avg_err;
+char status[1024], *s;				// string buffer for status message
+
+void record_error()
+	{
+	// ***** Calculate target value
+	double ideal[N];
+	target_func(X, ideal);
+
+	// ***** Calculate RMS (root-mean-squared) error
+	double sum_e2 = 0.0;
+	for (int n = 0; n < N; ++n)
+		{
+		double e = ideal[n] - lastLayer_g.neurons[n].output;
+		sum_e2 += e * e;
+		}
+	double RMS_err = sqrt(sum_e2 / N);
+	// printf("RMS error = %lf  ", RMS_error);
+
+	// **** Calculate average error in a cyclic buffer of RMS errors
+	// Update error arrays cyclically
+	// (This is easier to understand by referring to the next block of code)
+	sum_err2 -= errors2[tail];		// minus what is to be kicked out
+	sum_err2 += errors1[tail];		// add what is to be inserted
+	sum_err1 -= errors1[tail];		// minus what is to be kicked out
+	sum_err1 += RMS_err;		// add newly inserted
+	// printf("sum1, sum2 = %lf %lf\n", sum_err1, sum_err2);
+
+	avg_err = sum_err1 / err_cycle;	// ignore cases where a full cycle hasn't been filled
+	if (avg_err < 2.0)
+		s += sprintf(s, "avg RMS err=%1.06lf, ", avg_err);
+	else
+		s += sprintf(s, "avg RMS err=%e, ", avg_err);
+
+	// record new error in cyclic arrays
+	errors2[tail] = errors1[tail];		// errors2 = OLDER array
+	errors1[tail] = RMS_err;			// errors1 = NEWER array
+	++tail;
+	if (tail == err_cycle)				// loop back in cycle
+		tail = 0;
+	}
+
+// ***** Back-propagation for the entire network (g- and h-)
+void backward_prop()
+	{
+	double error[N];
+	back_prop(Net_g, error);
+
+	// ***** Bridge between g_network and h_networks
+	// This emulates the back-prop algorithm for 1 layer (see "g-and-h-networks.png")
+	// and the error is simply copied to each h-network
+	LAYER prevLayer = Net_g->layers[0];
+	for (int n = 0; n < N; n++)		// for error in bridge layer
+		{
+		// local gradient ≡ 1 for the bridge layer, because there's no sigmoid function
+		error[n] = prevLayer.neurons[n].grad;
+		}
+
+	// ***** Back-propagate the h-networks
+	for (int m = 0; m < M; m++)
+		back_prop(Net_h[m], error);
+
+	// ***** Updated weights of the h-networks is now averaged:
+	for (int l = 1; l < numLayers; ++l)		// for all layers except 0th which has no weights
+		for (int n = 0; n < Net_h[0]->layers[l].numNeurons; n++)	// for each neuron
+			for (int i = 0; i < Net_h[0]->layers[l - 1].numNeurons; i++) // for each weight
+				{
+				// Calculate average value
+				double avg = 0.0f;
+				for (int m = 0; m < M; ++m)		// for each multiplicity
+					avg += Net_h[m]->layers[l].neurons[n].weights[i + 1];
+				avg /= M;
+
+				// Overwrite all weights with average value
+				for (int m = 0; m < M; ++m)		// for each multiplicity
+					Net_h[m]->layers[l].neurons[n].weights[i + 1] = avg;
+				}
+	}
+
 int main(int argc, char **argv)
 	{
-	int neuronsPerLayer[] = {N, 10, 10, 10, N}; // first = input layer, last = output layer
-	int numLayers = sizeof (neuronsPerLayer) / sizeof (int);
+	// ***** Initialize g- and h-networks
+	Net_g = create_NN(numLayers, neuronsPerLayer);
+	lastLayer_g = Net_g->layers[numLayers - 1];
 
-	NNET *Net_g = create_NN(numLayers, neuronsPerLayer);
-	LAYER lastLayer_g = Net_g->layers[numLayers - 1];
-
-	NNET *Net_h[M];
-	LAYER lastLayer_h[M];
 	for (int m = 0; m < M; ++m)
 		{
 		Net_h[m] = create_NN(numLayers, neuronsPerLayer);
 		lastLayer_h[m] = Net_h[m]->layers[numLayers - 1];
 		}
 
-	// ***** We keep 2 arrays of errors, one is NEWER and one OLDER.
-	// The 2 arrays join together as one cyclic array.
-	// This enables us to compare the average errors of the NEW and OLD arrays,
-	// and calculate a RATIO of the two.
-	#define err_cycle	1000			// how many errors to record for averaging
-	double errors1[err_cycle], errors2[err_cycle]; // two arrays for recording errors
-	double sum_err1 = 0.0, sum_err2 = 0.0; // sums of errors
-	int tail = 0; // index for cyclic arrays (last-in, first-out)
-
-	double training_err = 0.0;
 	for (int i = 0; i < err_cycle; ++i) // clear errors to 0.0
 		errors1[i] = errors2[i] = 0.0;
 
-	srand(time(NULL));				// random seed
-
-	// ***** First we generate the random centers of N Gaussian functions
+	// ***** Generate random target function
+	// ie, generate the random centers of N Gaussian functions
 	// Note that these centers are 'sorted' such that the resulting points all reside in the
 	// 'symmetric' region.
 	for (int n = 0; n < N; ++n)
@@ -141,153 +237,23 @@ int main(int argc, char **argv)
 		printf("\n");
 		}
 
-	char status[1024], *s;				// string buffer for status message
-
-	for (int l = 1; true; ++l)			// main loop
+	for (int l = 1; true; ++l)			// ***** Main loop
 		{
 		s = status + sprintf(status, "[%05d] ", l);
 
 		// ***** Create M random X vectors (each of dim N)
 		for (int m = 0; m < M; ++m)
 			for (int i = 0; i < N; ++i)
-				// X[k] = (rand() / (float) RAND_MAX);
 				X[m][i] = random01();
 
-		// ***** Forward propagation
+		forward_prop();
 
-		for (int m = 0; m < M; ++m)
-			ForwardPropMethod(Net_h[m], N, X[m]);			// X[m] is updated
+		record_error();
 
-		// Bridge layer: add up X[m] to get Y
-		for (int i = 0; i < N; ++i)
-			{
-			Y[i] = 0;
-			for (int m = 0; m < M; ++m)
-				{
-				Y[i] += X[m][i];
-				}
-			}
-
-		ForwardPropMethod(Net_g, N, Y);					// Y is updated
-
-		// ***** Calculate target value
-
-		double ideal[N];
-		target_func(X, ideal);
-
-		// ***** Calculate the RMS (root-mean-squared) error
-
-		double error[N];
-		double sum_e2 = 0.0;
-		for (int n = 0; n < N; ++n)
-			{
-			double e = ideal[n] - lastLayer_g.neurons[n].output;
-			error[n] = e;
-			sum_e2 += e * e;
-			}
-		double RMS_error = sqrt(sum_e2 / N);
-
-		// **** Calculate average error in a cyclic buffer of RMS errors
-
-		training_err = RMS_error;		// ? dunno why I used 2 variable names
-		// printf("RMS error = %lf  ", training_err);
-
-		// **** Update error arrays cyclically
-		// (This is easier to understand by referring to the next block of code)
-		sum_err2 -= errors2[tail];		// minus what is to be kicked out
-		sum_err2 += errors1[tail];		// add what is to be inserted
-		sum_err1 -= errors1[tail];		// minus what is to be kicked out
-		sum_err1 += training_err;		// add newly inserted
-		// printf("sum1, sum2 = %lf %lf\n", sum_err1, sum_err2);
-
-		double avg_err = (l < err_cycle) ? (sum_err1 / l) : (sum_err1 / err_cycle);
-		if (avg_err < 2.0)
-			s += sprintf(s, "average RMS error=%1.06lf, ", avg_err);
-		else
-			s += sprintf(s, "average RMS error=%e, ", avg_err);
-
-		// record new error in cyclic arrays
-		errors2[tail] = errors1[tail];		// errors2 = OLDER array
-		errors1[tail] = training_err;		// errors1 = NEWER array
-		++tail;
-		if (tail == err_cycle)				// loop back in cycle
-			tail = 0;
-
-		// ***** Back-propagation
-		back_prop(Net_g, error);
-
-		// ***** Bridge between g_network and h_networks
-		// This emulates the back-prop algorithm for 1 layer (see "g-and-h-networks.png")
-		// and the error is simply copied to each h-network
-		LAYER prevLayer = Net_g->layers[0];
-		for (int n = 0; n < N; n++)		// for error in bridge layer
-			{
-			// local gradient ≡ 1 for the bridge layer, because there's no sigmoid function
-			error[n] = prevLayer.neurons[n].grad;
-			}
-
-		// ***** Back-propagate the h-networks
-		for (int m = 0; m < M; m++)
-			back_prop(Net_h[m], error);
-
-		// ***** Updated weights of the h-networks is now averaged:
-		for (int l = 1; l < numLayers; ++l)		// for all layers except 0th which has no weights
-			for (int n = 0; n < Net_h[0]->layers[l].numNeurons; n++)	// for each neuron
-				for (int i = 0; i < Net_h[0]->layers[l - 1].numNeurons; i++) // for each weight
-					{
-					// Calculate average value
-					double avg = 0.0f;
-					for (int m = 0; m < M; ++m)		// for each multiplicity
-						avg += Net_h[m]->layers[l].neurons[n].weights[i + 1];
-					avg /= M;
-
-					// Overwrite all weights with average value
-					for (int m = 0; m < M; ++m)		// for each multiplicity
-						Net_h[m]->layers[l].neurons[n].weights[i + 1] = avg;
-					}
-
-		// ***** Test the network
-		if ((l % 200) == -1)	// 0 = enable this part, -1 = disable
-			{
-			// Testing set
-			double test_err = 0.0;
-			#define numTests 50
-			for (int j = 0; j < numTests; ++j)
-				{
-				// Create random K vector
-				for (int m = 0; m < M; ++m)
-					for (int i = 0; i < N; ++i)
-						X[m][i] = random01();
-				// plot_tester(K[0], K[1]);
-
-				ForwardPropMethod(Net_g, N, X[0]);
-
-				// Desired value = K_star
-				double single_err = 0.0;
-				for (int k = 0; k < 1; ++k)
-					{
-					// double ideal = 1.0f - (0.5f - K[0]) * (0.5f - K[1]);
-					double ideal = 0.0;
-					// double ideal = K[k];				/* identity function */
-
-					// Difference between actual outcome and desired value:
-					double error = 0.0;  // ideal - lastLayer_h.neurons[k].output;
-
-					single_err += fabs(error); // record sum of errors
-					}
-				test_err += single_err;
-				}
-			test_err /= ((double) numTests);
-			if (test_err < 2.0)
-				s += sprintf(s, "random test |e|=%1.06lf, ", test_err);
-			else
-				s += sprintf(s, "random test |e|=%e, ", test_err);
-			if (test_err < ErrorThreshold)
-				break;
-			}
-
-		// **** If no convergence for a long time...
-		if (l > 50 && (isnan(avg_err) || avg_err > 10.0))
+		backward_prop();
+		
+		// **** If no convergence for a long time, re-randomize network
+		if (l > 100000 && (isnan(avg_err) || avg_err > 2.0))
 			{
 			re_randomize(Net_h[0], numLayers, neuronsPerLayer);
 			sum_err1 = 0.0; sum_err2 = 0.0;
@@ -304,9 +270,9 @@ int main(int argc, char **argv)
 			{
 			double ratio = (sum_err2 - sum_err1) / sum_err1;
 			if (ratio > 0)
-				s += sprintf(s, "|e| ratio=%e", ratio);
+				s += sprintf(s, "err ratio=%1.05lf", ratio);
 			else
-				s += sprintf(s, "|e| ratio=\x1b[31m%e\x1b[39;49m", ratio);
+				s += sprintf(s, "err ratio=\x1b[31m%1.05lf\x1b[39;49m", ratio);
 			//if (isnan(ratio))
 			//	break;
 			}
@@ -316,23 +282,9 @@ int main(int argc, char **argv)
 			// s += sprintf(s, "average error=%e", avg_err);
 			printf("%s\n", status);
 			}
-
-		// if (ratio - 0.5f < 0.0000001)	// ratio == 0.5 means stationary
-		// if (test_err < 0.01)
-
-		if (false)  // (userKey == 3)		// Re-start with new random weights
-			{
-			re_randomize(Net_h[0], numLayers, neuronsPerLayer);
-			sum_err1 = 0.0; sum_err2 = 0.0;
-			tail = 0;
-			for (int j = 0; j < err_cycle; ++j) // clear errors to 0.0
-				errors1[j] = errors2[j] = 0.0;
-			l = 1;
-
-			printf("\n****** Network re-randomized.\n");
-			}
 		}
 
+	// ***** Free allocated memory
 	free_NN(Net_g, neuronsPerLayer);
 	for (int m = 0; m < M; ++m)
 		free_NN(Net_h[m], neuronsPerLayer);
