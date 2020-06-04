@@ -202,23 +202,6 @@ void backward_prop()
 
 	// ***** Back-propagate the h-networks
 	back_prop_h(Net_h, error);
-
-	/***** Updated weights of the h-networks is now averaged:
-	for (int l = 1; l < numLayers_h; ++l)		// for all layers except 0th which has no weights
-		for (int n = 0; n < Net_h[0]->layers[l].numNeurons; n++)	// for each neuron
-			for (int i = 0; i < Net_h[0]->layers[l - 1].numNeurons; i++) // for each weight
-				{
-				// Calculate average value
-				double avg = 0.0f;
-				for (int m = 0; m < M; ++m)		// for each multiplicity
-					avg += Net_h[m]->layers[l].neurons[n].weights[i + 1];
-				avg /= M;
-
-				// Overwrite all weights with average value
-				for (int m = 0; m < M; ++m)		// for each multiplicity
-					Net_h[m]->layers[l].neurons[n].weights[i + 1] = avg;
-				}
-	*/
 	}
 
 int main(int argc, char **argv)
