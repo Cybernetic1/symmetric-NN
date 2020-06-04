@@ -274,13 +274,6 @@ int main(int argc, char **argv)
 				s += sprintf(s, "err ratio=%1.05lf", ratio);
 			else
 				s += sprintf(s, "err ratio=\x1b[31m%1.05lf\x1b[39;49m", ratio);
-			//if (isnan(ratio))
-			//	break;
-			}
-
-		if ((l % 5000) == 0) // display status periodically
-			{
-			// s += sprintf(s, "average error=%e", avg_err);
 			printf("%s\n", status);
 			}
 		}
