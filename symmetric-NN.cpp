@@ -94,7 +94,7 @@ NNET *Net_g;			// g-network
 LAYER lastLayer_g;
 NNET *Net_h[M];			// h-network × M times
 LAYER lastLayer_h[M];
-int neuronsPerLayer[] = {N, 10, N}; // first = input layer, last = output layer
+int neuronsPerLayer[] = {N, 5, 8, 5, N}; // first = input layer, last = output layer
 int numLayers = sizeof (neuronsPerLayer) / sizeof (int);
 
 // ***** Forward propagation (g- and h-networks)
@@ -120,6 +120,7 @@ void forward_prop()
 // The 2 arrays join together as one cyclic array.
 // This enables us to compare the average errors of the NEW and OLD arrays,
 // and calculate a RATIO of the two.
+double error[N];					// error of single pass
 #define err_cycle	1000			// how many errors to record for averaging
 double errors1[err_cycle], errors2[err_cycle]; // two arrays for recording errors
 double sum_err1 = 0.0, sum_err2 = 0.0; // sums of errors
@@ -138,6 +139,7 @@ void record_error()
 	for (int n = 0; n < N; ++n)
 		{
 		double e = ideal[n] - lastLayer_g.neurons[n].output;
+		error[n] = e;
 		sum_e2 += e * e;
 		}
 	double RMS_err = sqrt(sum_e2 / N);
@@ -169,7 +171,6 @@ void record_error()
 // ***** Back-propagation for the entire network (g- and h-)
 void backward_prop()
 	{
-	double error[N];
 	back_prop(Net_g, error);
 
 	// ***** Bridge between g_network and h_networks
@@ -266,7 +267,7 @@ int main(int argc, char **argv)
 			}
 
 		// ***** periodically display the ratio of average errors
-		if ((l % 1000) == 0)
+		if ((l % 5000) == 0)
 			{
 			double ratio = (sum_err2 - sum_err1) / sum_err1;
 			if (ratio > 0)
@@ -277,7 +278,7 @@ int main(int argc, char **argv)
 			//	break;
 			}
 
-		if ((l % 1000) == 0) // display status periodically
+		if ((l % 5000) == 0) // display status periodically
 			{
 			// s += sprintf(s, "average error=%e", avg_err);
 			printf("%s\n", status);
