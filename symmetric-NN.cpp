@@ -82,7 +82,7 @@ double target_func(array <array <double, N>, M> x, double *y)
 	// **** Sort input elements
 	sort(X.begin(), X.begin() + M, compareX);
 
-	#define k2 4.0				// k² where k = 10.0
+	#define k2 10.0				// k² where k = 10.0
 	for (int i = 0; i < N; ++i)		// calculate each component of y
 		{
 		y[i] = 0.0;
@@ -171,9 +171,9 @@ void record_error()
 
 	avg_err = sum_err1 / err_cycle;	// ignore cases where a full cycle hasn't been filled
 	if (avg_err < 2.0)
-		s += sprintf(s, "avg RMS err=%1.06lf, ", avg_err);
+		s += sprintf(s, "avg RMS err = %1.06lf, ", avg_err);
 	else
-		s += sprintf(s, "avg RMS err=%e, ", avg_err);
+		s += sprintf(s, "avg RMS err = %e, ", avg_err);
 
 	// record new error in cyclic arrays
 	errors2[tail] = errors1[tail];		// errors2 = OLDER array
@@ -236,6 +236,7 @@ int main(int argc, char **argv)
 
 	generate_random_target();
 
+	// **** Test target function
 	for (int l = 0; l < 1000; ++l)
 		{
 		// ***** Create M random X vectors (each of dim N)
@@ -251,7 +252,7 @@ int main(int argc, char **argv)
 			printf("%1.05lf ", ideal[i]);
 		printf("\b]\n");
 		}
-	
+
 	for (int l = 1; true; ++l)			// ***** Main loop
 		{
 		s = status + sprintf(status, "[%05d] ", l);
@@ -266,7 +267,7 @@ int main(int argc, char **argv)
 		record_error();
 
 		backward_prop();
-		
+
 		// **** If no convergence for a long time, re-randomize network
 		if (l > 100000 && (isnan(avg_err) || avg_err > 1.0))
 			{
@@ -285,9 +286,9 @@ int main(int argc, char **argv)
 			{
 			double ratio = (sum_err2 - sum_err1) / sum_err1;
 			if (ratio > 0)
-				s += sprintf(s, "err ratio=%1.05lf", ratio);
+				s += sprintf(s, "err ratio = \x1b[32m%1.05lf\x1b[39;49m", ratio);
 			else
-				s += sprintf(s, "err ratio=\x1b[31m%1.05lf\x1b[39;49m", ratio);
+				s += sprintf(s, "err ratio = \x1b[31m%1.05lf\x1b[39;49m", ratio);
 			printf("%s\n", status);
 			}
 		}
