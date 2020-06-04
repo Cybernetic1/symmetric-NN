@@ -100,17 +100,18 @@ double target_func(array <array <double, N>, M> x, double *y)
 // To test convergence, we record the sum of squared errors for the last M and last M..2M
 // trials, then compare their ratio.
 
-// Success: time 5:58, topology = {2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 1} (13 layers)
-//			ReLU units, learning rate 0.05, leakage 0.0
 #define ForwardPropMethod	forward_prop_sigmoid
 #define ErrorThreshold		0.02
 
 NNET *Net_g;			// g-network
 LAYER lastLayer_g;
+int NN_topology_g[] = {N, 5, 8, 10, 8, 5, N}; // first = input layer, last = output layer
+int numLayers_g = sizeof (NN_topology_g) / sizeof (int);
+
 NNET *Net_h[M];			// h-network × M times
 LAYER lastLayer_h[M];
-int neuronsPerLayer[] = {N, 5, 8, 5, N}; // first = input layer, last = output layer
-int numLayers = sizeof (neuronsPerLayer) / sizeof (int);
+int NN_topology_h[] = {N, 5, 8, 5, N}; // first = input layer, last = output layer
+int numLayers_h = sizeof (NN_topology_h) / sizeof (int);
 
 // ***** Forward propagation (g- and h-networks)
 void forward_prop()
@@ -203,7 +204,7 @@ void backward_prop()
 		back_prop(Net_h[m], error);
 
 	// ***** Updated weights of the h-networks is now averaged:
-	for (int l = 1; l < numLayers; ++l)		// for all layers except 0th which has no weights
+	for (int l = 1; l < numLayers_h; ++l)		// for all layers except 0th which has no weights
 		for (int n = 0; n < Net_h[0]->layers[l].numNeurons; n++)	// for each neuron
 			for (int i = 0; i < Net_h[0]->layers[l - 1].numNeurons; i++) // for each weight
 				{
@@ -222,13 +223,13 @@ void backward_prop()
 int main(int argc, char **argv)
 	{
 	// ***** Initialize g- and h-networks
-	Net_g = create_NN(numLayers, neuronsPerLayer);
-	lastLayer_g = Net_g->layers[numLayers - 1];
+	Net_g = create_NN(numLayers_g, NN_topology_g);
+	lastLayer_g = Net_g->layers[numLayers_g - 1];
 
 	for (int m = 0; m < M; ++m)
 		{
-		Net_h[m] = create_NN(numLayers, neuronsPerLayer);
-		lastLayer_h[m] = Net_h[m]->layers[numLayers - 1];
+		Net_h[m] = create_NN(numLayers_h, NN_topology_h);
+		lastLayer_h[m] = Net_h[m]->layers[numLayers_h - 1];
 		}
 
 	for (int i = 0; i < err_cycle; ++i) // clear errors to 0.0
@@ -271,7 +272,7 @@ int main(int argc, char **argv)
 		// **** If no convergence for a long time, re-randomize network
 		if (l > 100000 && (isnan(avg_err) || avg_err > 1.0))
 			{
-			re_randomize(Net_h[0], numLayers, neuronsPerLayer);
+			re_randomize(Net_h[0], numLayers_h, NN_topology_h);
 			sum_err1 = 0.0; sum_err2 = 0.0;
 			tail = 0;
 			for (int j = 0; j < err_cycle; ++j) // clear errors to 0.0
@@ -294,7 +295,7 @@ int main(int argc, char **argv)
 		}
 
 	// ***** Free allocated memory
-	free_NN(Net_g, neuronsPerLayer);
+	free_NN(Net_g, NN_topology_g);
 	for (int m = 0; m < M; ++m)
-		free_NN(Net_h[m], neuronsPerLayer);
+		free_NN(Net_h[m], NN_topology_h);
 	}
